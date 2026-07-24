@@ -13,30 +13,43 @@ import useDebounce from "../hooks/useDebounce";
 import { Package } from "lucide-react";
 
 const SORT_OPTIONS = [
-  { value: "newest",    label: "Newest first" },
+  { value: "newest", label: "Newest first" },
   { value: "price_asc", label: "Price: Low → High" },
-  { value: "price_desc",label: "Price: High → Low" },
+  { value: "price_desc", label: "Price: High → Low" },
 ];
 
 const ShopPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [medicines, setMedicines]   = useState<Medicine[]>([]);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const [search, setSearch]         = useState(searchParams.get("search")     ?? "");
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [categoryId, setCategoryId] = useState(searchParams.get("categoryId") ?? "");
-  const [minPrice, setMinPrice]     = useState(searchParams.get("minPrice")   ?? "");
-  const [maxPrice, setMaxPrice]     = useState(searchParams.get("maxPrice")   ?? "");
-  const [page, setPage]             = useState(Number(searchParams.get("page") ?? 1));
+  const [minPrice, setMinPrice] = useState(searchParams.get("minPrice") ?? "");
+  const [maxPrice, setMaxPrice] = useState(searchParams.get("maxPrice") ?? "");
+  const [page, setPage] = useState(Number(searchParams.get("page") ?? 1));
 
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
-    categoriesApi.getAll().then((r) => setCategories(r.data.data));
+    categoriesApi
+      .getAll()
+      .then((response) => {
+        const categoryList = Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+        setCategories(categoryList);
+      })
+      .catch(() => {
+        setCategories([]);
+      });
   }, []);
 
   const fetchMedicines = useCallback(async () => {
@@ -45,32 +58,48 @@ const ShopPage: React.FC = () => {
       const params: MedicineFilters = { limit: 12, page };
       if (debouncedSearch) params.search = debouncedSearch;
       if (categoryId) params.categoryId = categoryId;
-      if (minPrice)   params.minPrice   = minPrice;
-      if (maxPrice)   params.maxPrice   = maxPrice;
+      if (minPrice) params.minPrice = minPrice;
+      if (maxPrice) params.maxPrice = maxPrice;
 
       const res = await medicinesApi.getAll(params);
-      setMedicines(res.data.data.medicines);
-      setPagination(res.data.data.pagination);
 
-      // Sync URL params
+      const responseData = res?.data?.data ?? {};
+      const medicinesList = Array.isArray(responseData.medicines)
+        ? responseData.medicines
+        : [];
+
+      setMedicines(medicinesList);
+      setPagination(responseData.pagination ?? null);
+
       const p = new URLSearchParams();
       if (debouncedSearch) p.set("search", debouncedSearch);
-      if (categoryId)      p.set("categoryId", categoryId);
-      if (minPrice)        p.set("minPrice", minPrice);
-      if (maxPrice)        p.set("maxPrice", maxPrice);
-      if (page > 1)        p.set("page", String(page));
+      if (categoryId) p.set("categoryId", categoryId);
+      if (minPrice) p.set("minPrice", minPrice);
+      if (maxPrice) p.set("maxPrice", maxPrice);
+      if (page > 1) p.set("page", String(page));
       setSearchParams(p, { replace: true });
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch {
+      setMedicines([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
   }, [debouncedSearch, categoryId, minPrice, maxPrice, page, setSearchParams]);
 
-  useEffect(() => { fetchMedicines(); }, [fetchMedicines]);
+  useEffect(() => {
+    fetchMedicines();
+  }, [fetchMedicines]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1); }, [debouncedSearch, categoryId, minPrice, maxPrice]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, categoryId, minPrice, maxPrice]);
 
   const clearFilters = () => {
-    setSearch(""); setCategoryId(""); setMinPrice(""); setMaxPrice(""); setPage(1);
+    setSearch("");
+    setCategoryId("");
+    setMinPrice("");
+    setMaxPrice("");
+    setPage(1);
     setSearchParams({}, { replace: true });
   };
 
@@ -79,7 +108,6 @@ const ShopPage: React.FC = () => {
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -100,10 +128,8 @@ const ShopPage: React.FC = () => {
         </div>
 
         <div className="flex gap-6">
-
           {/* ── Sidebar Filters ─────────────────────────────────── */}
           <aside className={`w-56 flex-shrink-0 flex-col gap-4 ${filtersOpen ? "flex" : "hidden sm:flex"}`}>
-
             {/* Search */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 pointer-events-none" />
