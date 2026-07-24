@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         "/api": {
-          target: "https://medistore-backend-zg6b.onrender.com",
+          target: "https://medistore-ut8p.onrender.com",
           changeOrigin: true,
         },
       },
